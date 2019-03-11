@@ -1,2 +1,3 @@
 # HuffmanCode-javaVersion
-HuffmanCode for Learning in java with Junit.
+HuffmanCode is completed in java with Junit.  
+It is used for learning.
