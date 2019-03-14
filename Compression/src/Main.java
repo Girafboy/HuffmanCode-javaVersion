@@ -1,41 +1,46 @@
-import javax.print.attribute.standard.Compression;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.util.*;
 
 public class Main {
     public static void main(String[] args) {
-        Compression("trace06.txt","output.txt");
-        Decompression("output.txt","test.txt");
+        if(args.length!=2&&args.length!=3)
+            System.out.println("Usage: (-d) inputFIleName outputFileName");
+        if(args[0]!="-d")
+            Compression(args[0],args[1]);
+        else
+            Decompression(args[1],args[2]);
     }
     private static void Compression(String inputFile,String outputFile){
         try{
             FileInputStream fileInputStream =new FileInputStream(inputFile);
+            FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
+            if(fileInputStream.available()==0) return;
+
             byte[] bytes = fileInputStream.readAllBytes();
             int[] freq = new int[256];
             for(byte b : bytes)
-                freq[b]++;
+                freq[(int)b&0x00FF]++;
 
             Tree tree= new Tree(freq);
             Bit bits=new Bit();
             for(byte b : bytes)
-                bits.Append(tree.codes.getCode((char)b));
+                bits.Append(tree.codes.getCode((byte)b));
             byte[] result = bits.toByteArray();
-            FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
             fileOutputStream.write(bytes.length>>24);
             fileOutputStream.write(bytes.length>>16);
             fileOutputStream.write(bytes.length>>8);
             fileOutputStream.write(bytes.length);
             fileOutputStream.write('|');
+            fileOutputStream.write(tree.getLeafCount()>>8);
             fileOutputStream.write(tree.getLeafCount());
             for(int i=0 ; i<256 ; i++)
                 if(freq[i]!=0){
                     fileOutputStream.write(i);
-                    fileOutputStream.write(tree.codes.getCode((char)i).length());
-                    fileOutputStream.write(tree.codes.getCode((char)i).toByteArray());
+                    fileOutputStream.write(tree.codes.getCode((byte) i).length());
+                    fileOutputStream.write(tree.codes.getCode((byte) i).toByteArray());
                 }
             fileOutputStream.write('|');
             fileOutputStream.write(result);
@@ -50,6 +55,9 @@ public class Main {
     private static void Decompression(String inputFile, String outputFile) {
         try{
             FileInputStream fileInputStream =new FileInputStream(inputFile);
+            FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
+            if(fileInputStream.available()==0) return;
+
             int byteCount = fileInputStream.read();
             byteCount=(byteCount<<8)+fileInputStream.read();
             byteCount=(byteCount<<8)+fileInputStream.read();
@@ -57,6 +65,7 @@ public class Main {
             int flag1 =fileInputStream.read();
             if(flag1!='|') throw new Exception("Decompression file have a wrong format");
             int charCount =fileInputStream.read();
+            charCount =(charCount<<8)+fileInputStream.read();
 
             ArrayList<Boolean>[] codelist = new ArrayList[256];
             for(int i=0; i<charCount; i++){
@@ -77,7 +86,6 @@ public class Main {
             bits.Add(bytes,bytes.length*8);
 
             byte[] result = tree.decodes.getChar(bits,byteCount);
-            FileOutputStream fileOutputStream = new FileOutputStream(outputFile);
             fileOutputStream.write(result);
         }catch (FileNotFoundException e){
             System.out.println(e.toString());
@@ -142,10 +150,10 @@ class Tree {
         public void Add(char character, ArrayList<Boolean> code){
             codes[character]=code;
         }
-        public Bit getCode(char character){
+        public Bit getCode(byte character){
             Bit bits=new Bit();
-            if(codes[character]!=null)
-                for(Boolean b :codes[character]){
+            if(codes[(int)character&0x00FF]!=null)
+                for(Boolean b :codes[(int)character&0x00FF]){
                     bits.Add(b);
                 }
             return bits;
@@ -158,16 +166,17 @@ class Tree {
         }
         public byte[] getChar(Bit bit, int length){
             byte[] bytes = new byte[length];
-            int count=0;
+            int count=0, num=0;
             ArrayList<Boolean> booleans= bit.Get();
             ArrayList<Boolean> temp = new ArrayList<>();
             while(count<length){
-                temp.add(booleans.get(0));
-                booleans.remove(0);
+                temp.add(booleans.get(num));
+                num++;
                 if(map.containsKey(temp)){
                     bytes[count]= (byte) (char)map.get(temp);
                     count++;
                     temp.clear();
+                    System.out.println(count);
                 }
             }
             return bytes;
@@ -249,12 +258,8 @@ class Bit{
     public byte[] toByteArray(){
         byte[] bytes =new byte[(bits.size()+7)/8];
         for (int i=0;i<bits.size();i++){
-            if(bits.get(i)){
-                if(i==1012)
-                    i=i;
+            if(bits.get(i))
                 bytes[i/8]|=1<<(7-i%8);
-            }
-
         }
         return bytes;
     }
